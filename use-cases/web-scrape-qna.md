@@ -1,71 +1,93 @@
+---
+description: Learn how to scrape, upsert, and query a website
+---
+
 # Web Scrape QnA
+
+***
 
 Let's say you have a website (could be a store, an ecommerce site, a blog), and you want to scrap all the relative links of that website and have LLM answer any question on your website. In this tutorial, we are going to go through how to achieve that.
 
-### Upsert Flow
+You can find the example flow called - **WebPage QnA** from the marketplace templates.
 
-This flow is used to upsert all information from a website to a vector database, then have LLM answer user's question by looking up from the vector database.
+## Setup
 
-You can find the example flow called - **Conversational Retrieval QA Chain** from the marketplace templates.
+We are going to use **Cheerio Web Scraper** node to scrape links from a given URL and the **HtmlToMarkdown Text Splitter** to split the scraped content into smaller pieces.
 
-Here, we are going to use **Cheerio Web Scraper** node to scrape links from a given URL. Also replacing **RecursiveTextSplitter** to **HtmlToMarkdown** for cleaner data preparation.
+<figure><img src="../.gitbook/assets/image (86).png" alt=""><figcaption></figcaption></figure>
 
-<figure><img src="../.gitbook/assets/Untitled (4).png" alt=""><figcaption></figcaption></figure>
+If you do not specify anything, by default only the given URL page will be scraped. If you want to crawl the rest of relative links, click **Additional Parameters** of Cheerio Web Scraper.
 
-If you do not specify anything, by default only the given URL page will be scraped. If you want to crawl the rest of relative links, click **Additional Parameters.**
+## 1. Crawl Multiple Pages
 
-* **Get Relative Links Method** - how to crawl all relative links, Web Crawl or Sitemap
-* **Get Relative Links Limit** - how many links to crawl, set 0 to crawl all
+1. Select `Web Crawl` or `Scrape XML Sitemap` in **Get Relative Links Method**.
+2. Input `0` in **Get Relative Links Limit** to retrieve all links available from the provided URL.
 
-<figure><img src="../.gitbook/assets/image (2) (1).png" alt="" width="563"><figcaption></figcaption></figure>
+<figure><img src="../.gitbook/assets/image (87).png" alt="" width="563"><figcaption></figcaption></figure>
 
-When you open the chat and start asking question, all links will be scraped and upserted into vector database (Pinecone in this case).
+### Manage Links (Optional)
 
-From the console/terminal, you can see all the links that are being scraped:
+1. Input desired URL to be crawled.
+2. Click **Fetch Links** to retrieve links based on the inputs of the **Get Relative Links Method** and **Get Relative Links Limit** in **Additional Parameters**.
+3. In **Crawled Links** section, remove unwanted links by clicking **Red Trash Bin Icon**.
+4. Lastly, click **Save**.
 
-<figure><img src="../.gitbook/assets/image (5).png" alt="" width="563"><figcaption></figcaption></figure>
+<figure><img src="../.gitbook/assets/image (88).png" alt="" width="563"><figcaption></figcaption></figure>
 
-Navigate to Pinecone dashboard, you will be able to see new vectors being added under the namespace you have specified in the flow.
+## 2. Upsert
 
-<figure><img src="../.gitbook/assets/Untitled (2).png" alt="" width="563"><figcaption></figcaption></figure>
+1. On the top right corner, you will notice a green button:
 
-_**Few things to keep in mind**_
+<figure><img src="../.gitbook/assets/Untitled (2).png" alt=""><figcaption></figcaption></figure>
 
-* Once the flow is set, documents will only get upserted once when user start asking first question from the UI or API or Embedded Chat.
-* Documents will <mark style="color:red;">**not**</mark> get upserted again whenever user ask another question.
-* The <mark style="color:red;">**only**</mark> condition where documents get upserted again is when the flow configuration (like different file, different models, different pinecone index, etc) have changed, and you have to save the chatflow again.
-* In the other words, we store the flow state, and if a new save is done, we check if `existing state == new state`, if not, do upsert, if yes, ignore.
-* However, sometimes you might want to change some settings like metadata but you don't want another upsert to be done again.
-* Therefore, it is generally recommended to create another flow to load the existing index from vector store.
+2. A dialog will be shown that allow users to upsert data to Pinecone:
 
-### Load Existing Index Flow
+<figure><img src="../.gitbook/assets/image (2) (1) (1) (1) (1) (1) (1) (1) (1) (1) (1) (2).png" alt=""><figcaption></figcaption></figure>
 
-This flow is used to load an existing index/collection from vector store, typically after you have upserted the documents to that particular index/collection.
+**Note:** Under the hood, following actions will be executed:
 
-<figure><img src="../.gitbook/assets/image (9).png" alt=""><figcaption></figcaption></figure>
+* Scraped all HTML data using Cheerio Web Scraper
+* Convert all scraped data from HTML to Markdown, then split it
+* Splitted data will be looped over, and converted to vector embeddings using OpenAI Embeddings
+* Vector embeddings will be upserted to Pinecone
 
-If you have specified namespace or metadata from the upsert flow, remember to specify here as well, under the **Additional Parameters** in Pinecone node.
+3. On the [Pinecone console](https://app.pinecone.io) you will be able to see the new vectors that were added.
 
-<figure><img src="../.gitbook/assets/image (3) (1).png" alt="" width="563"><figcaption></figcaption></figure>
+<figure><img src="../.gitbook/assets/web-scrape-pinecone.png" alt=""><figcaption></figcaption></figure>
 
-It is recommended to specify a system message for the **Conversational Retrieval QA Chain**. For example, you can specify the name of AI, the language to answer, the response when answer its not found (to prevent hallucination).
+## 3. Query
 
-{% code overflow="wrap" %}
-```
-I want you to act as a document that I am having a conversation with. Your name is "AI Assistant". You will provide me with answers from the given info. If the answer is not included, say exactly "Hmm, I am not sure." and stop after that. Refuse to answer any question not about the info. Only answer in English. Never break character.
-```
-{% endcode %}
+Querying is relatively straight-forward. After you have verified that data is upserted to vector database, you can start asking question in the chat:
 
-<figure><img src="../.gitbook/assets/Untitled (1).png" alt=""><figcaption></figcaption></figure>
+<figure><img src="../.gitbook/assets/image (4) (1) (1) (1) (1) (1) (1) (1) (1) (1) (2).png" alt=""><figcaption></figcaption></figure>
 
-That's it! You can start asking question [🤔](https://emojipedia.org/thinking-face/)
+In the Additional Parameters of Conversational Retrieval QA Chain, you can specify 2 prompts:
 
-<figure><img src="../.gitbook/assets/image (4) (1).png" alt=""><figcaption></figcaption></figure>
+* **Rephrase Prompt:** Used to rephrase the question given the past conversation history
+* **Response Prompt:** Using the rephrased question, retrieve the context from vector database, and return a final response
+
+<figure><img src="../.gitbook/assets/image (91).png" alt=""><figcaption></figcaption></figure>
+
+{% hint style="info" %}
+It is recommended to specify a detailed response prompt message. For example, you can specify the name of AI, the language to answer, the response when answer its not found (to prevent hallucination).
+{% endhint %}
 
 You can also turn on the Return Source Documents option to return a list of document chunks where the AI's response is coming from.
 
-<figure><img src="../.gitbook/assets/Untitled.png" alt="" width="563"><figcaption></figcaption></figure>
+<figure><img src="../.gitbook/assets/Untitled (1) (1) (1) (1).png" alt="" width="563"><figcaption></figcaption></figure>
 
-The same logic can be applied to any document use cases, not just limited to web scraping.
+## Additional Web Scraping
 
-If you have any suggestion on how to improve the performance, we'd love your contribution!
+Apart from Cheerio Web Scraper, there are other nodes that can perform web scraping as well:
+
+* **Puppeteer:** Puppeteer is a Node.js library that provides a high-level API for controlling headless Chrome or Chromium. You can use Puppeteer to automate web page interactions, including extracting data from dynamic web pages that require JavaScript to render.
+* **Playwright:** Playwright is a Node.js library that provides a high-level API for controlling multiple browser engines, including Chromium, Firefox, and WebKit. You can use Playwright to automate web page interactions, including extracting data from dynamic web pages that require JavaScript to render.
+* **Apify:** [Apify](https://apify.com/) is a cloud platform for web scraping and data extraction, which provides an [ecosystem](https://apify.com/store) of more than a thousand ready-made apps called _Actors_ for various web scraping, crawling, and data extraction use cases.
+
+<figure><img src="../.gitbook/assets/image (92).png" alt=""><figcaption></figcaption></figure>
+
+{% hint style="info" %}
+The same logic can be applied to any document use cases, not just limited to web scraping!
+{% endhint %}
+
+If you have any suggestion on how to improve the performance, we'd love your [contribution](../contributing/)!
